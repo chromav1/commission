@@ -1,0 +1,131 @@
+-- wrapped for toggling
+local esp_key = "event"
+
+-- event object esp
+local plr = game.Players.LocalPlayer
+local items = {}
+
+local function makeESP(trigger)
+    -- main 
+    local label = Drawing.new("Text")
+    label.Size = 16
+    label.Center = true
+    label.Outline = true
+    label.Visible = false
+    label.Color = Color3.fromRGB(255, 165, 0) -- orange
+    label.Font = 2
+    
+    -- distance text 
+    local distLabel = Drawing.new("Text")
+    distLabel.Size = 14
+    distLabel.Center = true
+    distLabel.Outline = true
+    distLabel.Visible = false
+    distLabel.Color = Color3.fromRGB(255, 255, 255)
+    distLabel.Font = 2
+    
+    items[trigger] = {
+        label = label,
+        distLabel = distLabel
+    }
+end
+
+local function updateESP()
+    local char = plr.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    for trigger, esp in pairs(items) do
+        if trigger and trigger.Parent then
+            -- put the esp above 
+            local pos = trigger.Position + Vector3.new(0, 3, 0)
+            local screenPos, onScreen = WorldToScreen(pos)
+            
+            if onScreen then
+                esp.label.Text = "Event Item"
+                esp.label.Position = Vector2.new(screenPos.X, screenPos.Y - 10)
+                esp.label.Visible = true
+                
+                if root then
+                    -- calc distance farness thing
+                    local dx = root.Position.X - trigger.Position.X
+                    local dy = root.Position.Y - trigger.Position.Y
+                    local dz = root.Position.Z - trigger.Position.Z
+                    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    esp.distLabel.Text = math.floor(dist) .. "m"
+                    esp.distLabel.Position = Vector2.new(screenPos.X, screenPos.Y + 10)
+                    esp.distLabel.Visible = true
+                else
+                    esp.distLabel.Visible = false
+                end
+            else
+                -- not visible
+                esp.label.Visible = false
+                esp.distLabel.Visible = false
+            end
+        else
+            -- item go bye bye
+            esp.label:Remove()
+            esp.distLabel:Remove()
+            items[trigger] = nil
+        end
+    end
+end
+
+local function scanForItems()
+    local map = workspace:FindFirstChild("Map")
+    if not map then
+        return 0
+    end
+    
+    local eventObjects = map:FindFirstChild("EventObjects")
+    if not eventObjects then
+        return 0
+    end
+    
+    local newFound = 0
+    
+    -- lf eventobj models w trigger
+    for _, thing in ipairs(eventObjects:GetChildren()) do
+        if thing:IsA("Model") and thing.Name:find("EventObject") then
+            -- find the trigger part inside
+            local trigger = thing:FindFirstChild("Trigger")
+            if trigger and trigger:IsA("BasePart") then
+                -- add esp if we haven't already
+                if not items[trigger] then
+                    makeESP(trigger)
+                    newFound = newFound + 1
+                    print("✓ found new event item at:", thing:GetFullName())
+                end
+            end
+        end
+    end
+    
+    return newFound
+end
+
+-- wait for map
+wait(2)
+print("=== starting event item esp ===")
+local initialCount = scanForItems()
+print("initial scan complete - tracking " .. initialCount .. " event items")
+
+-- check 15 20
+spawn(function()
+    while true do
+    if not _G.lunar_esps.event.on then break end
+        wait(math.random(15, 20))
+        local found = scanForItems()
+        if found > 0 then
+            print("rescan found " .. found .. " new event items")
+        end
+    end
+end)
+
+-- updatttttt
+while true do
+    if not _G.lunar_esps.event.on then break end
+    if isrbxactive() then
+        updateESP()
+    end
+    wait(0.01)
+end
