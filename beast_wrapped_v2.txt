@@ -1,0 +1,166 @@
+-- wrapped beast esp
+local plrs = game:GetService("Players")
+local lplr = plrs.LocalPlayer
+
+local boxes = {}
+local red = Color3.fromRGB(255, 0, 0)
+local white = Color3.fromRGB(255, 255, 255)
+
+local function createBox(plr)
+    if plr == lplr then return end
+    if boxes[plr] then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 3
+    box.Filled = false
+    box.Visible = false
+    box.Color = red
+    box.Transparency = 1
+    
+    local name = Drawing.new("Text")
+    name.Size = 16
+    name.Center = true
+    name.Outline = true
+    name.Visible = false
+    name.Color = red
+    name.Font = 2
+    
+    local dist = Drawing.new("Text")
+    dist.Size = 14
+    dist.Center = true
+    dist.Outline = true
+    dist.Visible = false
+    dist.Color = white
+    dist.Font = 2
+    
+    boxes[plr] = {box = box, name = name, dist = dist}
+end
+
+local function removeBox(plr)
+    if boxes[plr] then
+        pcall(function() boxes[plr].box:Remove() end)
+        pcall(function() boxes[plr].name:Remove() end)
+        pcall(function() boxes[plr].dist:Remove() end)
+        boxes[plr] = nil
+    end
+end
+
+local function cleanup()
+    for plr, _ in pairs(boxes) do
+        removeBox(plr)
+    end
+    print("beast esp cleaned up")
+end
+
+local function hasHammer(plr)
+    if not plr.Character then return false end
+    if plr.Character:FindFirstChild("Hammer") then return true end
+    local bp = plr:FindFirstChild("Backpack")
+    if bp and bp:FindFirstChild("Hammer") then return true end
+    return false
+end
+
+local function updateBoxes()
+    if not _G.lunar_esps.beast.on then cleanup() return end
+    
+    local myChar = lplr.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    
+    for plr, esp in pairs(boxes) do
+        if not plr or not plr.Parent then
+            removeBox(plr)
+        elseif plr.Character and hasHammer(plr) then
+            local char = plr.Character
+            local hum = char:FindFirstChild("Humanoid")
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local head = char:FindFirstChild("Head")
+            
+            if hum and hrp and head and hum.Health > 0 then
+                local headPos, headVis = WorldToScreen(head.Position + Vector3.new(0, 0.5, 0))
+                local legPos, legVis = WorldToScreen(hrp.Position - Vector3.new(0, 3, 0))
+                
+                if headVis and legVis then
+                    local h = math.abs(headPos.Y - legPos.Y)
+                    local w = h / 2
+                    local centerX = (headPos.X + legPos.X) / 2
+                    
+                    esp.box.Size = Vector2.new(w, h)
+                    esp.box.Position = Vector2.new(centerX - w/2, headPos.Y)
+                    esp.box.Visible = true
+                    
+                    esp.name.Text = plr.Name .. " [BEAST]"
+                    esp.name.Position = Vector2.new(centerX, headPos.Y - 15)
+                    esp.name.Visible = true
+                    
+                    if myRoot then
+                        local dx = myRoot.Position.X - hrp.Position.X
+                        local dy = myRoot.Position.Y - hrp.Position.Y
+                        local dz = myRoot.Position.Z - hrp.Position.Z
+                        local distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+                        esp.dist.Text = math.floor(distance) .. "m"
+                        esp.dist.Position = Vector2.new(centerX, legPos.Y + 10)
+                        esp.dist.Visible = true
+                    else
+                        esp.dist.Visible = false
+                    end
+                else
+                    esp.box.Visible = false
+                    esp.name.Visible = false
+                    esp.dist.Visible = false
+                end
+            else
+                esp.box.Visible = false
+                esp.name.Visible = false
+                esp.dist.Visible = false
+            end
+        else
+            esp.box.Visible = false
+            esp.name.Visible = false
+            esp.dist.Visible = false
+        end
+    end
+end
+
+local function scanForBeasts()
+    if not _G.lunar_esps.beast.on then return end
+    
+    for _, plr in ipairs(plrs:GetPlayers()) do
+        if plr ~= lplr and hasHammer(plr) then
+            if not boxes[plr] then
+                createBox(plr)
+            end
+        end
+    end
+end
+
+for _, plr in ipairs(plrs:GetPlayers()) do
+    createBox(plr)
+end
+
+plrs.PlayerAdded:Connect(function(plr)
+    createBox(plr)
+end)
+
+plrs.PlayerRemoving:Connect(function(plr)
+    removeBox(plr)
+end)
+
+spawn(function()
+    while _G.lunar_esps.beast.on do
+        wait(30)
+        if _G.lunar_esps.beast.on then
+            scanForBeasts()
+        end
+    end
+    cleanup()
+end)
+
+print("beast esp loaded")
+
+while _G.lunar_esps.beast.on do
+    if isrbxactive() then
+        updateBoxes()
+    end
+    wait(0.008)
+end
+cleanup()

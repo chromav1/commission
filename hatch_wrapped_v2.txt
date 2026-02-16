@@ -1,0 +1,114 @@
+-- wrapped hatch esp
+local plr = game.Players.LocalPlayer
+local hatches = {}
+
+local function makeESP(trigger)
+    local label = Drawing.new("Text")
+    label.Size = 16
+    label.Center = true
+    label.Outline = true
+    label.Visible = false
+    label.Color = Color3.fromRGB(255, 255, 0)
+    label.Font = 2
+    
+    local distLabel = Drawing.new("Text")
+    distLabel.Size = 14
+    distLabel.Center = true
+    distLabel.Outline = true
+    distLabel.Visible = false
+    distLabel.Color = Color3.fromRGB(255, 255, 255)
+    distLabel.Font = 2
+    
+    hatches[trigger] = {label = label, distLabel = distLabel}
+end
+
+local function cleanup()
+    for trigger, esp in pairs(hatches) do
+        pcall(function() esp.label:Remove() end)
+        pcall(function() esp.distLabel:Remove() end)
+    end
+    hatches = {}
+    print("hatch esp cleaned up")
+end
+
+local function updateESP()
+    if not _G.lunar_esps.hatch.on then cleanup() return end
+    
+    local char = plr.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    for trigger, esp in pairs(hatches) do
+        if trigger and trigger.Parent then
+            local pos = trigger.Position + Vector3.new(0, 3, 0)
+            local screenPos, onScreen = WorldToScreen(pos)
+            
+            if onScreen then
+                esp.label.Text = "Hatch"
+                esp.label.Position = Vector2.new(screenPos.X, screenPos.Y - 10)
+                esp.label.Visible = true
+                
+                if root then
+                    local dx = root.Position.X - trigger.Position.X
+                    local dy = root.Position.Y - trigger.Position.Y
+                    local dz = root.Position.Z - trigger.Position.Z
+                    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    esp.distLabel.Text = math.floor(dist) .. "m"
+                    esp.distLabel.Position = Vector2.new(screenPos.X, screenPos.Y + 10)
+                    esp.distLabel.Visible = true
+                else
+                    esp.distLabel.Visible = false
+                end
+            else
+                esp.label.Visible = false
+                esp.distLabel.Visible = false
+            end
+        else
+            pcall(function() esp.label:Remove() end)
+            pcall(function() esp.distLabel:Remove() end)
+            hatches[trigger] = nil
+        end
+    end
+end
+
+local function scanForHatches()
+    if not _G.lunar_esps.hatch.on then return 0 end
+    
+    local map = workspace:FindFirstChild("Map")
+    if not map then return 0 end
+    
+    local newFound = 0
+    for _, thing in ipairs(map:GetDescendants()) do
+        if thing:IsA("Model") and thing.Name == "Hatch" then
+            local trigger = thing:FindFirstChild("Trigger")
+            if trigger and trigger:IsA("BasePart") then
+                if not hatches[trigger] then
+                    makeESP(trigger)
+                    newFound = newFound + 1
+                end
+            end
+        end
+    end
+    return newFound
+end
+
+wait(2)
+print("starting hatch esp")
+scanForHatches()
+
+spawn(function()
+    while _G.lunar_esps.hatch.on do
+        wait(math.random(15, 20))
+        if _G.lunar_esps.hatch.on then
+            scanForHatches()
+        end
+    end
+    cleanup()
+end)
+
+while _G.lunar_esps.hatch.on do
+    if isrbxactive() then
+        updateESP()
+    end
+    wait(0.01)
+end
+cleanup()
