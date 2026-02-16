@@ -1,0 +1,121 @@
+-- computer esp (vers6767)
+local plr = game.Players.LocalPlayer
+local pcs = {}
+
+local function makeESP(screen)
+    -- main 
+    local label = Drawing.new("Text")
+    label.Size = 16
+    label.Center = true
+    label.Outline = true
+    label.Visible = false
+    label.Color = Color3.fromRGB(0, 255, 255)
+    label.Font = 2
+    
+    -- distance below 
+    local distLabel = Drawing.new("Text")
+    distLabel.Size = 14
+    distLabel.Center = true
+    distLabel.Outline = true
+    distLabel.Visible = false
+    distLabel.Color = Color3.fromRGB(255, 255, 255)
+    distLabel.Font = 2
+    
+    pcs[screen] = {
+        label = label,
+        distLabel = distLabel
+    }
+end
+
+local function updateESP()
+    local char = plr.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    for screen, esp in pairs(pcs) do
+        if screen and screen.Parent then
+            -- float it above the screen a bit
+            local pos = screen.Position + Vector3.new(0, 3, 0)
+            local screenPos, onScreen = WorldToScreen(pos)
+            
+            if onScreen then
+                esp.label.Text = "Computer"
+                esp.label.Position = Vector2.new(screenPos.X, screenPos.Y - 10)
+                esp.label.Visible = true
+                
+                if root then
+                    -- dihstance 
+                    local dx = root.Position.X - screen.Position.X
+                    local dy = root.Position.Y - screen.Position.Y
+                    local dz = root.Position.Z - screen.Position.Z
+                    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    esp.distLabel.Text = math.floor(dist) .. "m"
+                    esp.distLabel.Position = Vector2.new(screenPos.X, screenPos.Y + 10)
+                    esp.distLabel.Visible = true
+                else
+                    esp.distLabel.Visible = false
+                end
+            else
+                -- off screen
+                esp.label.Visible = false
+                esp.distLabel.Visible = false
+            end
+        else
+            -- computer go sleep
+            esp.label:Remove()
+            esp.distLabel:Remove()
+            pcs[screen] = nil
+        end
+    end
+end
+
+local function scanForComputers()
+    local map = workspace:FindFirstChild("Map")
+    if not map then
+        return 0
+    end
+    
+    local newFound = 0
+    
+    -- scan for all pcs
+    for _, thing in ipairs(map:GetDescendants()) do
+        if thing:IsA("Model") and thing.Name == "ComputerTable" then
+            -- grab the screen (it's a UnionOperation, not just a BasePart)
+            local screen = thing:FindFirstChild("Screen")
+            if screen and (screen:IsA("BasePart") or screen:IsA("UnionOperation")) then
+                -- only add if we don't already have it
+                if not pcs[screen] then
+                    makeESP(screen)
+                    newFound = newFound + 1
+                    print("✓ found new computer at:", thing:GetFullName())
+                end
+            end
+        end
+    end
+    
+    return newFound
+end
+
+-- initial scan
+wait(2)
+print("initialising computer esp")
+local initialCount = scanForComputers()
+print("initial scan complete - tracking " .. initialCount .. " computers")
+
+-- rescan every 15-20 seconds in the background (stagger is gay)
+spawn(function()
+    while true do
+        wait(math.random(15, 20)) -- rand 15-20
+        local found = scanForComputers()
+        if found > 0 then
+            print("rescan found " .. found .. " new computers")
+        end
+    end
+end)
+
+-- update visuals
+while true do
+    if isrbxactive() then
+        updateESP()
+    end
+    wait(0.01)
+end
